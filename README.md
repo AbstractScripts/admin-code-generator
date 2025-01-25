@@ -4,7 +4,9 @@
     "token": "<bot token>",
     "clientId": "<bot client id>",
     "guildIds": [
-        <guild_id>
+        "988346332479631360",
+        "889844633155272744",
+        "1037061765495783444"
     ] 
 }
 ```
