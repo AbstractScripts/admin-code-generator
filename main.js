@@ -11,36 +11,35 @@ const foldersPath = path.join(__dirname, 'commands');
 const commandFolders = fs.readdirSync(foldersPath);
 
 for (const folder of commandFolders) {
-	const commandsPath = path.join(foldersPath, folder);
-	const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
-	for (const file of commandFiles) {
-		const filePath = path.join(commandsPath, file);
-		const command = require(filePath);
-		if ('data' in command && 'execute' in command) {
-			commands.set(command.data.name, command);
-		} else {
-			console.log(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
-		}
-	}
+    const commandsPath = path.join(foldersPath, folder);
+    const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
+    for (const file of commandFiles) {
+        const filePath = path.join(commandsPath, file);
+        const command = require(filePath);
+        if ('data' in command && 'execute' in command) {
+            commands.set(command.data.name, command);
+        } else {
+            console.log(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
+        }
+    }
 }
 
 const rest = new REST().setToken(token);
 (async () => {
-	try {
-        for(const guild in guildIds){
-            console.log(`[Guild: ${guild}] Started refreshing ${commands.length} application (/) commands.`);
+    try {
+        for (const guildId of guildIds) {
+            console.log(`[Guild: ${guildId}] Started refreshing ${commands.size} application (/) commands.`);
 
-            // The put method is used to fully refresh all commands in the guild with the current set
             const data = await rest.put(
-                Routes.applicationGuildCommands(clientId, guildIds[guild]),
+                Routes.applicationGuildCommands(clientId, guildId),
                 { body: commands.map(command => command.data.toJSON()) },
             );
 
-            console.log(`[Guild: ${guild}] Successfully reloaded ${data.length} application (/) commands.`);
+            console.log(`[Guild: ${guildId}] Successfully reloaded ${data.length} application (/) commands.`);
         }
-	} catch (error) {
-		console.error(error);
-	}
+    } catch (error) {
+        console.error(error);
+    }
 })();
 
 client.addListener(Events.InteractionCreate, async interaction => {
@@ -52,8 +51,10 @@ client.addListener(Events.InteractionCreate, async interaction => {
         await command.execute(interaction);
     } catch (error) {
         console.error(error);
-        await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true });
+        if (!interaction.replied && !interaction.deferred) {
+            await interaction.reply({ content: 'There was an error while executing this command!', flags: 64 });
+        }
     }
-})
+});
 
 client.login(token);
