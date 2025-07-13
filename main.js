@@ -25,34 +25,54 @@ for (const folder of commandFolders) {
 }
 
 const rest = new REST().setToken(token);
-(async () => {
-    try {
-        for (const guildId of guildIds) {
-            console.log(`[Guild: ${guildId}] Started refreshing ${commands.size} application (/) commands.`);
 
+async function registerCommands(guildId, commands) {
+    let retries = 3;
+    while (retries > 0) {
+        try {
             const data = await rest.put(
                 Routes.applicationGuildCommands(clientId, guildId),
-                { body: commands.map(command => command.data.toJSON()) },
+                { body: commands.map(command => command.data.toJSON()) }
             );
-
             console.log(`[Guild: ${guildId}] Successfully reloaded ${data.length} application (/) commands.`);
+            return;
+        } catch (error) {
+            console.error(`[Guild: ${guildId}] Retry ${4 - retries}/3 failed:`, error);
+            retries--;
+            if (retries === 0) throw error;
+            await new Promise(resolve => setTimeout(resolve, 2000)); // Attesa di 2 secondi prima del retry
+        }
+    }
+}
+
+(async () => {
+    try {
+        console.log('Commands to register:', commands.map(command => command.data.toJSON()));
+        for (const guildId of guildIds) {
+            console.log(`[Guild: ${guildId}] Started refreshing ${commands.size} application (/) commands.`);
+            await registerCommands(guildId, commands);
+            await new Promise(resolve => setTimeout(resolve, 1000)); // Ritardo di 1 secondo tra guild
         }
     } catch (error) {
-        console.error(error);
+        console.error('Error registering commands:', error);
     }
 })();
 
 client.addListener(Events.InteractionCreate, async interaction => {
     if (!interaction.isCommand()) return;
+    console.log(`Processing interaction: ${interaction.id}, command: ${interaction.commandName}`);
     const command = commands.get(interaction.commandName);
-    if (!command) return;
+    if (!command) {
+        console.log(`Command ${interaction.commandName} not found`);
+        return;
+    }
 
     try {
         await command.execute(interaction);
     } catch (error) {
-        console.error(error);
+        console.error(`Error executing command ${interaction.commandName} (ID: ${interaction.id}):`, error);
         if (!interaction.replied && !interaction.deferred) {
-            await interaction.reply({ content: 'There was an error while executing this command!', flags: 64 });
+            await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true });
         }
     }
 });
